@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang=pl>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<style>
+    body {
+    background-color: #f0f0f0; /* Kolor tła */
+    font-family: Arial, sans-serif; /* Czcionka */
+    margin: 0;
+    padding: 0;
+}
+
+    .registration-form-container {
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #fff;
+}
+
+/* Styl dla nagłówka formularza */
+.registration-header {
+    font-size: 24px;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+/* Styl dla formularza */
+.registration-form {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Styl dla przycisku rejestracji */
+.registration-button {
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    margin-top: 10px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+/* Styl dla komunikatów błędów */
+.messages {
+    list-style-type: none;
+    padding: 0;
+    margin-top: 10px;
+}
+
+.messages li {
+    padding: 5px;
+}
+
+.error {
+    color: #f00;
+}
+
+.logout-button {
+    background-color: #FF5733; /* Kolor tła */
+    color: #fff; /* Kolor tekstu */
+    border: none;
+    padding: 10px 20px;
+    margin-top: 10px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+/* Styl dla przycisku wylogowania po najechaniu myszką */
+.logout-button:hover {
+    background-color: #E54E2E; /* Kolor tła po najechaniu myszką */
+}
+</style>
+<body>
+{% block content %}
+    <div class="registration-form-container">
+        <h1 class="registration-header">Rejestracja NIP</h1>
+
+        {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                    <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        <form class="registration-form" method="post" action="{% url 'register_nip' %}">
+            {% csrf_token %}
+            {{ registration_form.as_p }}
+            <button class="registration-button" type="submit">Zarejestruj NIP</button>
+        </form>
+    </div>
+
+    <h1>Twoje numery NIP</h1>
+
+    <ul>
+        {% for nip in user_nips %}
+            <li>{{ nip.nip }} - {{ nip.current_status }}</li>
+        {% endfor %}
+    </ul>
+
+    {% if user.is_authenticated %}
+        <a href="{% url 'logout' %}" class="logout-button">Wyloguj się</a>
+    {% endif %}
+{% endblock %}
+</body>
+</html>

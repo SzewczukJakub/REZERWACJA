@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<style>
+    body {
+    background-color: #f0f0f0; /* Kolor tła */
+    font-family: Arial, sans-serif; /* Czcionka */
+    margin: 0;
+    padding: 0;
+}
+
+    .registration-form-container {
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #fff;
+}
+
+/* Styl dla nagłówka formularza */
+.registration-header {
+    font-size: 24px;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+/* Styl dla formularza */
+.registration-form {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Styl dla przycisku rejestracji */
+.registration-button {
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    margin-top: 10px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+/* Styl dla komunikatów błędów */
+.messages {
+    list-style-type: none;
+    padding: 0;
+    margin-top: 10px;
+}
+
+.messages li {
+    padding: 5px;
+}
+
+.error {
+    color: #f00;
+}
+</style>
+<body>
+ {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                    <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                {% endfor %}
+            </ul>
+ {% endif %}
+<form method="post" action="/your-registration-url/" class="registration-form">
+    <input type="hidden" name="csrfmiddlewaretoken" value="...">
+    <p><label for="id_email">Email:</label> <input type="email" name="email" id="id_email"></p>
+    <p><label for="id_nip">NIP:</label> <input type="text" name="nip" id="id_nip"></p>
+    <p><label for="id_nazwa">Nazwa:</label> <input type="text" name="nazwa" id="id_nazwa"></p>
+    <p><label for="id_numer_telefonu_klienta">Numer telefonu klienta:</label> <input type="text" name="numer_telefonu_klienta" id="id_numer_telefonu_klienta"></p>
+    <button type="submit">Register</button>
+
+</form>
+</body>
+</html>
