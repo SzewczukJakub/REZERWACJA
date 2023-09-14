@@ -10,52 +10,60 @@
 <body>
 {% block content %}
     <h1>Panel Administratora</h1>
-<table>
-    <thead>
-        <tr>
-            <th>NIP</th>
-            <th>Email</th>
-            <th>Status</th>
-            <th>Rezerwacja Wygasa</th>
-        </tr>
-    </thead>
-    <tbody>
-        <form method="post">
-            {% csrf_token %}
-            {% for record in records %}
-            <tr>
-                <td>{{ record.nip }}</td>
-                <td><input type="text" name="email_{{ record.id }}" value="{{ record.email }}"></td>
-                <td><input type="text" name="status_{{ record.id }}" value="{{ record.status }}"></td>
-                <td><input type="text" name="expiration_{{ record.id }}" value="{{ record.expiration }}"></td>
-            </tr>
-            {% endfor %}
-            <tr>
-                <td colspan="4"><button type="submit">Zapisz zmiany</button></td>
-            </tr>
-        </form>
-    </tbody>
-</table>
-
-<h2>Email Addresses</h2>
-<form method="post">
-    {% csrf_token %}
     <table>
         <thead>
             <tr>
-                <th>Email Address</th>
+                <th>NIP</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Rezerwacja Wygasa</th>
             </tr>
         </thead>
         <tbody>
-            {% for email in emails %}
-            <tr>
-                <td><input type="email" name="email_{{ email.id }}" value="{{ email.email }}"></td>
-            </tr>
-            {% endfor %}
+            <form method="post">
+                {% csrf_token %}
+                {% for record in records %}
+                <tr>
+                    <td>{{ record.nip }}</td>
+                    <td><input type="text" name="email_{{ record.id }}" value="{{ record.email }}"></td>
+                    <td><input type="text" name="status_{{ record.id }}" value="{{ record.status }}"></td>
+                    <td><input type="text" name="expiration_{{ record.id }}" value="{{ record.expiration }}"></td>
+                </tr>
+                {% endfor %}
+                <tr>
+                    <td colspan="4"><button type="submit">Zapisz zmiany</button></td>
+                </tr>
+            </form>
+            <form method="post" action="{% url 'import_records' %}">
+                {% csrf_token %}
+                <button type="submit" name="import-records" value="Import">Import</button>
+            </form>
+            <form method="post" action="{% url 'export_records' %}">
+                {% csrf_token %}
+                <button type="submit" name="export-records" value="Export">Export</button>
+            </form>
         </tbody>
     </table>
-    <button type="submit">Save Changes</button>
-</form>
+
+    <h2>Email Addresses</h2>
+    <form method="post">
+        {% csrf_token %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Email Address</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for email in emails %}
+                <tr>
+                    <td><input type="email" name="email_{{ email.id }}" value="{{ email.email }}"></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <button type="submit">Save Changes</button>
+    </form>
 {% endblock %}
 </body>
 </html>

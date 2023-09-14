@@ -1,67 +1,84 @@
 import csv
-
 from django.contrib import admin, messages
-from django.shortcuts import render
+from django.http import HttpResponse
 from django.urls import reverse
-
-from .models import NIPRecord
-from .models import EmailAddress
-from django.http import HttpResponse, HttpResponseRedirect
+from io import TextIOWrapper
+from django_object_actions import DjangoObjectActions
+from django.utils.html import format_html
+from django.urls import path
 from .forms import NIPRecordImportForm
+from .models import NIPRecord, EmailAddress
+from django.shortcuts import render, redirect
+
+
+class ImportAdmin(DjangoObjectActions, admin.ModelAdmin):
+    def imports(modeladmin, request, queryset):
+        print("Imports button pushed")
+
+    changelist_actions = ('imports', )
 
 class NIPRecordAdmin(admin.ModelAdmin):
- list_display = ('nip', 'nazwa', 'email_klienta', 'numer_telefonu_klienta', 'data_poczatkowa', 'data_koncowa', 'status')
+    list_display = (
+        'nip', 'nazwa', 'email_klienta', 'numer_telefonu_klienta', 'data_poczatkowa', 'data_koncowa', 'status')
 
- # Dodaj własny formularz importu rekordów
- change_list_template = 'admin/import_records.html'
+    actions = ['export_selected_records']
 
- actions = ['export_selected_records']
+    def import_records_button(self, obj):
+        return format_html(
+            '<a class="button" href="{}">Importuj dane z CSV</a>',
+            reverse('admin:import_records')  # Użyj odpowiedniej nazwy URL dla widoku importu
+        )
 
- def import_nip_records(request):
-     if request.method == 'POST':
-         form = NIPRecordImportForm(request.POST, request.FILES)
-         if form.is_valid():
-             file = form.cleaned_data['file']
-             # Obsługa importu rekordów z pliku Excel
-             # ...
-             messages.success(request, 'Rekordy NIP zostały zaimportowane pomyślnie.')
-             return HttpResponseRedirect(reverse('admin:niprecord_changelist'))
-         else:
-             messages.error(request, 'Wystąpił błąd podczas importowania rekordów NIP.')
-     else:
-         form = NIPRecordImportForm()
+    import_records_button.short_description = "Importuj dane z CSV"
 
-     context = {'form': form}
+    def import_records(self, request):
+        if request.method == "POST" and request.FILES.get("file"):
+            csv_file = request.FILES["file"]
 
-     return render(request, 'admin/niprecord/niprecord_import.html', context)
+            if csv_file.name.endswith('.csv'):
+                csv_file_wrapper = TextIOWrapper(csv_file.file, encoding='utf-8-sig')
+                csv_reader = csv.reader(csv_file_wrapper)
 
- def export_selected_records(self, request, queryset):
-     response = HttpResponse(content_type='text/csv')
-     response['Content-Disposition'] = 'attachment; filename="nip_records.csv"'
+                for row in csv_reader:
+                    if len(row) >= len(NIPRecord._meta.fields):
+                        data_dict = {}
+                        for i, field in enumerate(NIPRecord._meta.fields):
+                            column_name = field.name
+                            data_dict[column_name] = row[i]
 
-     writer = csv.writer(response)
-     writer.writerow(['NIP', 'Nazwa', 'Email', 'Numer Telefonu', 'Data Początkowa', 'Data Końcowa', 'Status'])
+                        NIPRecord.objects.create(**data_dict)
 
-     for record in queryset:
-         writer.writerow([record.nip, record.nazwa, record.email_klienta, record.numer_telefonu_klienta,
-                          record.data_poczatkowa, record.data_koncowa, record.status])
+                self.message_user(request, "Rekordy zostały zaimportowane pomyślnie.")
+            else:
+                self.message_user(request, "Wybierz poprawny plik CSV do importu.")
 
-     return response
+        else:
+            form = NIPRecordImportForm()
+            return render(request, 'admin/import_records.html', {'form': form})
+        return HttpResponse("File upload complete. <a href='../'>Return to import page</a>")
 
- export_selected_records.short_description = "Eksportuj zaznaczone rekordy"
+    def export_selected_records(self, request, queryset):
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="nip_records.csv"'
 
- def get_urls(self):
-     from django.urls import path
-     from . import views
+        writer = csv.writer(response)
+        writer.writerow(['nip', 'nazwa', 'email_klienta', 'numer_telefonu_klienta', 'data_poczatkowa', 'data_koncowa', 'status'])
 
-     # Dodaj ścieżki dla twoich własnych widoków
-     urlpatterns = super().get_urls()
-     urlpatterns += [
-         path('import-records/', self.admin_site.admin_view(views.import_records), name='import_records'),
-         # Dodaj inne widoki i ich ścieżki tutaj
-     ]
-     return urlpatterns
+        for record in queryset:
+            writer.writerow([record.nip, record.nazwa, record.email_klienta, record.numer_telefonu_klienta,
+                             record.data_poczatkowa, record.data_koncowa, record.status])
+
+        return response
+
+    export_selected_records.short_description = "Eksportuj zaznaczone rekordy"
+
+    def get_urls(self):
+        urlpatterns = super().get_urls()
+        custom_urls = [
+            path('import_records/', self.import_records, name='import_records'),
+        ]
+        return custom_urls + urlpatterns
 
 
-admin.site.register(EmailAddress)
 admin.site.register(NIPRecord, NIPRecordAdmin)
+admin.site.register(EmailAddress)

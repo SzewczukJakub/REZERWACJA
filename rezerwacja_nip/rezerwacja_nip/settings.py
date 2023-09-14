@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rezerwacja_nip_app',
+    'django_object_actions',
 ]
 
 MIDDLEWARE = [

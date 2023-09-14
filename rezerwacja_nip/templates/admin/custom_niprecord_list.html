@@ -1,0 +1,64 @@
+{#{% extends "admin/change_list.html" %}#}
+{##}
+{#{% block content %}#}
+{#<div id="content-main">#}
+{#    <h1>Wybierz rekord NIP do zmiany</h1>#}
+{##}
+{#    <!-- Dodaj przycisk Import -->#}
+{#    <div class="module" id="nip-import">#}
+{#        <h2>Import rekordów NIP</h2>#}
+{#        <form method="post" enctype="multipart/form-data" action="{% url 'import_records' %}">#}
+{#            {% csrf_token %}#}
+{#            {{ form.as_p }}#}
+{#            <button type="submit" class="default">Zaimportuj rekordy</button>#}
+{#        </form>#}
+{#    </div>#}
+{##}
+{#    {% if action_form and actions_on_top and cl.full_result_count %}#}
+{#    <form id="changelist-form" method="post" action="">#}
+{#        {% csrf_token %}#}
+{#        {% if cl.action_checkbox and cl.show_admin_actions %}#}
+            {# Include any custom actions here if needed #}
+{#        {% endif %}#}
+{#        <div class="results">#}
+{#            <!-- Your custom HTML to display the list of NIP records goes here -->#}
+{#            <table>#}
+{#                <thead>#}
+{#                    <tr>#}
+{#                        <th>NIP</th>#}
+{#                        <th>Nazwa</th>#}
+{#                        <th>Email</th>#}
+{#                        <th>Telefon</th>#}
+{#                        <th>Data Początkowa</th>#}
+{#                        <th>Data Końcowa</th>#}
+{#                        <!-- Include other column headers here -->#}
+{#                    </tr>#}
+{#                </thead>#}
+{#                <tbody>#}
+{#                    {% for record in cl.result_list %}#}
+{#                        <tr>#}
+{#                            <td>{{ record.nip }}</td>#}
+{#                            <td>{{ record.nazwa }}</td>#}
+{#                            <td>{{ record.email_klienta }}</td>#}
+{#                            <td>{{ record.numer_telefonu }}</td>#}
+{#                            <td>{{ record.data_poczatkowa }}</td>#}
+{#                            <td>{{ record.data_koncowa }}</td>#}
+{#                            <!-- Include other record fields here -->#}
+{#                        </tr>#}
+{#                    {% endfor %}#}
+{#                </tbody>#}
+{#            </table>#}
+{#        </div>#}
+{#    </form>#}
+{#    {% endif %}#}
+{#</div>#}
+{#{% endblock %}#}
+{% extends "admin/change_list.html" %}
+{% load i18n static %}
+
+{% block object-tools-items %}
+{{ block.super }}
+<li>
+    <a href="{% url 'admin:import_records' %}" class="btn btn-high btn-success">Import</a>
+</li>
+{% endblock %}

@@ -31,7 +31,7 @@ def admin_nip_list(request):
 def admin_panel(request):
     emails = EmailAddress.objects.all()
     nips = NIPRecord.objects.all()
-    return render(request, 'admin_panel.html', {'emails': emails, 'nips': nips})
+    return render(request, 'admin_panel.html', {'emails': emails, 'nip_records': nips})
 
 
 @admin_required
@@ -58,6 +58,8 @@ def nip_list(request):
         return redirect('admin_panel')  # Przekierowanie z powrotem do panelu admina
 
     return render(request, 'admin_panel.html', {'records': records})
+
+
 
 
 def admin_login(request):
@@ -182,20 +184,26 @@ def import_records(request):
     if request.method == 'POST':
         uploaded_file = request.FILES['file']
 
-        # Wczytaj dane z pliku Excel przy użyciu pandas
+        # Check if the uploaded file has the .xlsx extension
         if uploaded_file.name.endswith('.xlsx'):
-            df = pd.read_excel(uploaded_file)
+            try:
+                # Read the Excel file into a DataFrame
+                df = pd.read_excel(uploaded_file)
 
-            # Przetwarzaj dane i zapisuj do bazy danych, np.:
-            for index, row in df.iterrows():
-                nip = row['nip']
-                nazwa = row['nazwa']
-                email = row['email']
-                numer_telefonu = row['numer_telefonu']
+                # Process and save data to the NIPRecord model
+                for index, row in df.iterrows():
+                    nip = row['nip']
+                    nazwa = row['nazwa']
+                    email = row['email']
+                    numer_telefonu = row['numer_telefonu']
 
-                # Tutaj możesz zapisać dane do modelu NIPRecord
+                    # Create a new NIPRecord instance and save it
+                    NIPRecord.objects.create(nip=nip, nazwa=nazwa, email_klienta=email,
+                                             numer_telefonu_klienta=numer_telefonu)
 
-            return HttpResponse('Import zakończony pomyślnie.')
+                return HttpResponse('Import zakończony pomyślnie.')
+            except Exception as e:
+                return HttpResponse(f'Błąd podczas importowania danych: {str(e)}')
         else:
             return HttpResponse('Niewłaściwy format pliku. Zaimportuj plik Excel w formacie .xlsx.')
 
