@@ -1,4 +1,6 @@
 import csv
+
+import pandas as pd
 from django.contrib import admin, messages
 from django.http import HttpResponse
 from django.urls import reverse
@@ -23,7 +25,7 @@ class NIPRecordAdmin(admin.ModelAdmin):
 
     actions = ['export_selected_records']
 
-    def import_records_button(self, obj):
+    def import_records_button(self):
         return format_html(
             '<a class="button" href="{}">Importuj dane z CSV</a>',
             reverse('admin:import_records')  # Użyj odpowiedniej nazwy URL dla widoku importu
@@ -32,31 +34,34 @@ class NIPRecordAdmin(admin.ModelAdmin):
     import_records_button.short_description = "Importuj dane z CSV"
 
     def import_records(self, request):
-        if request.method == "POST" and request.FILES.get("file"):
-            csv_file = request.FILES["file"]
+        if request.method == 'POST':
+            uploaded_file = request.FILES.get('file')
 
-            if csv_file.name.endswith('.csv'):
-                csv_file_wrapper = TextIOWrapper(csv_file.file, encoding='utf-8-sig')
-                csv_reader = csv.reader(csv_file_wrapper)
+            if uploaded_file:
+                # Sprawdź, czy przesłany plik ma rozszerzenie .csv
+                if uploaded_file.name.endswith('.csv'):
+                    try:
+                        # Wczytaj plik CSV do DataFrame
+                        df = pd.read_csv(uploaded_file, encoding='utf-8-sig')
 
-                for row in csv_reader:
-                    if len(row) >= len(NIPRecord._meta.fields):
-                        data_dict = {}
-                        for i, field in enumerate(NIPRecord._meta.fields):
-                            column_name = field.name
-                            data_dict[column_name] = row[i]
+                        # Przetwórz i zapisz dane do modelu NIPRecord
+                        for index, row in df.iterrows():
+                            nip = row['nip']
+                            nazwa = row['nazwa']
+                            email = row['email_klienta']
+                            numer_telefonu = row['numer_telefonu_klienta']
 
-                        NIPRecord.objects.create(**data_dict)
+                            # Utwórz nowy rekord NIPRecord i zapisz go w bazie danych
+                            NIPRecord.objects.create(nip=nip, nazwa=nazwa, email_klienta=email,
+                                                     numer_telefonu_klienta=numer_telefonu)
 
-                self.message_user(request, "Rekordy zostały zaimportowane pomyślnie.")
-            else:
-                self.message_user(request, "Wybierz poprawny plik CSV do importu.")
+                        self.message_user(request, 'Import zakończony pomyślnie.')
+                    except Exception as e:
+                        self.message_user(request, f'Błąd podczas importowania danych: {str(e)}')
+                else:
+                    self.message_user(request, 'Niewłaściwy format pliku. Zaimportuj plik CSV.')
 
-        else:
-            form = NIPRecordImportForm()
-            return render(request, 'admin/import_records.html', {'form': form})
-        return HttpResponse("File upload complete. <a href='../'>Return to import page</a>")
-
+        return render(request, 'admin/import_records.html', {'form': NIPRecordImportForm()})
     def export_selected_records(self, request, queryset):
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="nip_records.csv"'
