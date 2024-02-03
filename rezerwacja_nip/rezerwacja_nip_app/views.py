@@ -16,10 +16,15 @@ from django.contrib import messages
 from django.http import HttpResponseRedirect
 import pandas as pd
 from django.http import HttpResponse
+from django.db import IntegrityError
+from django.shortcuts import get_object_or_404
+from .models import Settings
+from django.utils.encoding import force_str
+
 
 @login_required
 def user_nip_list(request):
-    user_nips = NIPRecord.objects.filter(email_klienta=request.user.email)
+    user_nips = NIPRecord.objects.filter(email_uzytkownika=request.user.email)
     return render(request, 'user_nip_list.html', {'user_nips': user_nips})
 
 @admin_required
@@ -106,56 +111,89 @@ def home(request):
         registration_form = NIPRegistrationForm()
         return redirect('login_view')  # Przekieruj do strony logowania
 
-from .models import NIPRecord
+
+from django.http import HttpResponseBadRequest
 
 def register_nip(request):
+    registration_form = NIPRegistrationForm()  # Move the form instantiation outside the if-else block
+
     if request.method == 'POST':
         registration_form = NIPRegistrationForm(request.POST)
+        nip = registration_form.data['nip']
+        provided_email = registration_form.data['email']
+        if not provided_email:
+            messages.error(request, 'Podaj email')
+            return render(request, 'registration_template.html', {'registration_form': registration_form})
+        if not nip:
+            messages.error(request, 'Podaj nip')
+            return render(request, 'registration_template.html', {'registration_form': registration_form})
+
+
         if registration_form.is_valid():
-            email = registration_form.cleaned_data['email']
-            nip = registration_form.cleaned_data['nip']
+            nazwa = registration_form.cleaned_data['nazwa']
+            numer_telefonu_klienta = registration_form.cleaned_data['numer_telefonu_klienta']
+            if not nazwa and not numer_telefonu_klienta:
+                messages.error(request, 'Podaj numer lub nazwę.')
+            else:
+                user = request.user
 
-            try:
-                email_instance = EmailAddress.objects.get(email=email)
+                # Check if the user is assigned to the provided email
 
-                # Sprawdź, czy numer NIP jest prawidłowy (10 cyfr)
-                if not validate_nip(nip):
-                    messages.error(request, 'Numer NIP musi składać się z 10 cyfr.')
-                else:
-                    # Sprawdź, czy numer NIP już istnieje w bazie danych
-                    existing_nip_record = NIPRecord.objects.filter(nip=nip).first()
-                    if existing_nip_record:
-                        # Jeśli istniejący numer NIP ma inny adres e-mail, wyświetl tylko status
-                        if existing_nip_record.email_klienta != email_instance:
-                            status = existing_nip_record.current_status()
-                            messages.error(request, f'Status NIP: {status}')
+                try:
+                    email_instance = EmailAddress.objects.get(user=user, email=provided_email)
+                except EmailAddress.DoesNotExist:
+                    messages.error(request, 'Brak uprawnień do tego adresu email.')
+                    return render(request, 'registration_template.html', {'registration_form': registration_form})
+
+                try:
+                    # Check if the NIP already exists for any email
+                    existing_nip_records = NIPRecord.objects.filter(nip=nip)
+
+                    if existing_nip_records.exists():
+                        # If the NIP exists, check expiration and status before updating
+                        conflicting_record = existing_nip_records.first()
+
+                        if conflicting_record.data_koncowa < timezone.now() or conflicting_record.status == 'Wolny do rezerwacji':
+                            # Update the existing record
+                            messages.success(request, 'NIP już istnieje. Aktualizuję dane.')
+                            conflicting_record.nazwa = nazwa
+                            conflicting_record.numer_telefonu_klienta = numer_telefonu_klienta
+                            conflicting_record.data_poczatkowa = timezone.now()
+                            settings_instance = Settings.objects.first()
+                            expiration_days_value = settings_instance.expiration_days
+                            expiration_date = timezone.now() + timedelta(days=expiration_days_value)
+                            conflicting_record.data_koncowa = expiration_date
+                            conflicting_record.status = 'Zarejestrowany'
+                            conflicting_record.save()
+                            return HttpResponseRedirect(reverse('home'))
                         else:
-                            # Jeśli istniejący numer NIP jest przypisany do tego samego e-maila,
-                            # wyświetl wszystkie dostępne dane o tym numerze NIP
-                            status = existing_nip_record.current_status()
-                            reservation_date = existing_nip_record.data_poczatkowa
-                            expiration_date = existing_nip_record.data_koncowa
-                            messages.error(request, f'Ten numer NIP jest już przypisany do tego adresu email. '
-                                                   f'Status: {status}, '
-                                                   f'Rezerwacja od: {reservation_date}, '
-                                                   f'Ważny do: {expiration_date}')
+                            messages.error(request, 'NIP jest aktualnie zajęty. Spróbuj ponownie później.')
                     else:
-                        expiration_date = timezone.now() + timedelta(days=60)
+                        try:
+                            # If the NIP doesn't exist, create a new record
+                            settings_instance = Settings.objects.first()  # Get the Settings instance
+                            expiration_days_value = settings_instance.expiration_days
+                            expiration_date = timezone.now() + timedelta(days=expiration_days_value)
+                            NIPRecord.objects.create(
+                                nip=nip,
+                                email_uzytkownika=email_instance,
+                                data_poczatkowa=timezone.now(),
+                                data_koncowa=expiration_date,
+                                nazwa=nazwa,
+                                numer_telefonu_klienta=numer_telefonu_klienta
+                            )
+                            messages.success(request, 'NIP został zarejestrowany pomyślnie.')
+                            return HttpResponseRedirect(reverse('home'))
+                        except IntegrityError as e:
+                            messages.error(request, 'Błąd podczas rejestracji NIP: {}'.format(str(e)))
+                except EmailAddress.DoesNotExist:
+                    messages.error(request, 'Błąd w bazie danych: nie znaleziono adresu email.')
+        else:
+            messages.error(request, 'Nieprawidłowy NIP lub numer telefonu.')
 
-                        NIPRecord.objects.create(
-                            nip=nip,
-                            email_klienta=email_instance.email,
-                            data_poczatkowa=timezone.now(),
-                            data_koncowa=expiration_date
-                        )
-                        messages.success(request, 'NIP został zarejestrowany pomyślnie.')
-                        return HttpResponseRedirect(reverse('home'))
-            except EmailAddress.DoesNotExist:
-                messages.error(request, 'Adres email nie istnieje w bazie danych.')
-    else:
-        registration_form = NIPRegistrationForm()
-
+    # If the code reaches here, it means either the request method is not 'POST' or the form is not valid
     return render(request, 'registration_template.html', {'registration_form': registration_form})
+
 
 
 
@@ -177,7 +215,7 @@ def check_nip_status(request):
     return redirect('home')  # Adjust the URL here
 
 def validate_nip(nip):
-    return len(nip) == 10 and nip.isdigit()
+    return len(str(nip)) == 10 and str(nip).isdigit()
 
 
 def import_records(request):
@@ -198,7 +236,7 @@ def import_records(request):
                     numer_telefonu = row['numer_telefonu']
 
                     # Create a new NIPRecord instance and save it
-                    NIPRecord.objects.create(nip=nip, nazwa=nazwa, email_klienta=email,
+                    NIPRecord.objects.create(nip=nip, nazwa=nazwa, email_uzytkownika=email,
                                              numer_telefonu_klienta=numer_telefonu)
 
                 return HttpResponse('Import zakończony pomyślnie.')
@@ -220,3 +258,23 @@ def export_records(request):
     df.to_excel(response, index=False, engine='openpyxl')
 
     return response
+
+def update_expiration_days(request, record_id):
+    # Assuming you have a model named YourModel with an attribute named 'expiration_days'
+    record = get_object_or_404(NIPRecord, id=record_id)
+
+    if request.method == 'POST':
+        # Handle form submission or any logic to update expiration_days
+        # For example, you might have a form with a field named 'new_expiration_days'
+        new_expiration_days = request.POST.get('new_expiration_days')
+        record.expiration_days = new_expiration_days
+        record.save()
+
+        # Redirect to a success page or back to the admin page
+        return HttpResponseRedirect(reverse('admin:your_model_change', args=[record.id]))
+
+    # Render a template for the update_expiration_days page
+    return render(request, 'update_expiration_days.html', {'record': record})
+
+
+

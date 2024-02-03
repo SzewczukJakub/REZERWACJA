@@ -1,13 +1,96 @@
-<!-- registration_template.html -->
-{% if messages %}
-            <ul class="messages">
-                {% for message in messages %}
-                    <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-                {% endfor %}
-            </ul>
-{% endif %}
-<form method="post" action="{% url 'register_nip' %}">
-    {% csrf_token %}
-    {{ registration_form.as_p }}
-    <button type="submit">Register</button>
-</form>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Rejestracja</title>
+</head>
+<style>
+    body {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        background-color: #f0f0f0;
+        font-family: Arial, sans-serif;
+        padding: 0;
+    }
+
+    .registration-form-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        max-width: 400px;
+        /* ... other styles ... */
+    }
+
+    /* Style labels */
+    .registration-form label {
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+
+    /* Set a fixed width for input fields */
+    .registration-form input[type="text"],
+    .registration-form input[type="email"] {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        margin-bottom: 10px;
+    }
+
+    /* Style the submit button */
+    .registration-form button[type="submit"] {
+        background-color: #007bff;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        margin-top: 10px;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+
+    /* Style the error messages */
+    .messages {
+        list-style-type: none;
+        padding: 0;
+        margin-top: 10px;
+    }
+
+    .messages li {
+        padding: 5px;
+        color: #f00;
+    }
+
+    #img {
+        width: 20%;
+        margin-bottom: 20px; /* Add margin to separate the logo from the form */
+    }
+</style>
+<body>
+<div id="logo">
+    <img src="/home/sabukxdl/REZERWACJA/rezerwacja_nip/resources/elomoto.eco-logo-final.png" alt="Company Logo" id="img">
+</div>
+<div class="registration-form-container">
+    {% if messages %}
+      <ul class="messages">
+         {% for message in messages %}
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+    {% endfor %}
+      </ul>
+    {% endif %}
+    <!-- Your form elements and content go here -->
+    <form method="post" action=" " class="registration-form">
+        {% csrf_token %}
+        <p><label for="id_email">Email:</label> <input type="email" name="email" id="id_email"></p>
+        <p><label for="id_nip">NIP:</label> <input type="text" name="nip" id="id_nip"></p>
+        <p><label for="id_nazwa">Nazwa:</label> <input type="text" name="nazwa" id="id_nazwa"></p>
+        <p><label for="id_numer_telefonu_klienta">Numer telefonu klienta:</label> <input type="text" name="numer_telefonu_klienta" id="id_numer_telefonu_klienta"></p>
+        <button type="submit">Register</button>
+    </form>
+    <a href="/user_nip_list">Powrót</a>
+</div>
+</body>
+</html>

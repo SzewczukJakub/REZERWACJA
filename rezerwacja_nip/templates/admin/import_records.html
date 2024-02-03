@@ -1,13 +1,14 @@
 {% extends "admin/base.html" %}
-{% load i18n admin_urls static %}
+{% load i18n %}
 
 {% block content %}
-  <div class="module">
-    <h2>Import rekordów NIP</h2>
-    <form method="post" enctype="multipart/form-data" action="{% url 'admin:import_records' %}">
-      {% csrf_token %}
-      {{ form.as_p }}
-      <button type="submit" class="default">Zaimportuj rekordy</button>
+<div class="module">
+    <h2>{% trans "Import Data" %}</h2>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <input type="file" name="file" required>
+        <p><input type="submit" name="_save" value="Import NIP Records" class="default" /></p>
     </form>
-  </div>
+</div>
 {% endblock %}

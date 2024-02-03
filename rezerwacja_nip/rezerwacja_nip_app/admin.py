@@ -1,34 +1,34 @@
+from django.contrib import admin
 import csv
-
 import pandas as pd
-from django.contrib import admin, messages
 from django.http import HttpResponse
 from django.urls import reverse
-from io import TextIOWrapper
-from django_object_actions import DjangoObjectActions
 from django.utils.html import format_html
 from django.urls import path
 from .forms import NIPRecordImportForm
 from .models import NIPRecord, EmailAddress
-from django.shortcuts import render, redirect
+from django.shortcuts import render
+from django_object_actions import DjangoObjectActions
+from .models import User
+from django.contrib.admin.models import LogEntry, CHANGE
+from django.contrib.contenttypes.models import ContentType
+from django.utils.encoding import force_str
 
-
-class ImportAdmin(DjangoObjectActions, admin.ModelAdmin):
-    def imports(modeladmin, request, queryset):
-        print("Imports button pushed")
-
-    changelist_actions = ('imports', )
+class CustomLogEntryAdmin(admin.ModelAdmin):
+    list_display = ['action_time', 'user', 'content_type', 'object_repr', 'change_message']
 
 class NIPRecordAdmin(admin.ModelAdmin):
     list_display = (
-        'nip', 'nazwa', 'email_klienta', 'numer_telefonu_klienta', 'data_poczatkowa', 'data_koncowa', 'status')
+        'nip', 'nazwa', 'email_uzytkownika', 'numer_telefonu_klienta', 'data_poczatkowa', 'data_koncowa', 'status')
+    list_filter = ('email_uzytkownika', 'status','nazwa')
+    search_fields = ('nip', 'nazwa', 'email_uzytkownika', 'numer_telefonu_klienta')
 
     actions = ['export_selected_records']
 
     def import_records_button(self):
         return format_html(
             '<a class="button" href="{}">Importuj dane z CSV</a>',
-            reverse('admin:import_records')  # Użyj odpowiedniej nazwy URL dla widoku importu
+            reverse('admin:import_records')  # Use the appropriate URL name for the import view
         )
 
     import_records_button.short_description = "Importuj dane z CSV"
@@ -38,39 +38,115 @@ class NIPRecordAdmin(admin.ModelAdmin):
             uploaded_file = request.FILES.get('file')
 
             if uploaded_file:
-                # Sprawdź, czy przesłany plik ma rozszerzenie .csv
                 if uploaded_file.name.endswith('.csv'):
                     try:
-                        # Wczytaj plik CSV do DataFrame
                         df = pd.read_csv(uploaded_file, encoding='utf-8-sig')
 
-                        # Przetwórz i zapisz dane do modelu NIPRecord
+                        denied_records = []  # Store denied NIP records
+                        successful_imports = 0
+
+                        # Pobierz użytkownika wykonującego import
+                        user = request.user
+
                         for index, row in df.iterrows():
                             nip = row['nip']
                             nazwa = row['nazwa']
-                            email = row['email_klienta']
+                            email = row['email_uzytkownika']
                             numer_telefonu = row['numer_telefonu_klienta']
+                            data_poczatkowa = row.get('data_poczatkowa', None)
 
-                            # Utwórz nowy rekord NIPRecord i zapisz go w bazie danych
-                            NIPRecord.objects.create(nip=nip, nazwa=nazwa, email_klienta=email,
-                                                     numer_telefonu_klienta=numer_telefonu)
+                            # Check if the NIP record already exists
+                            if NIPRecord.objects.filter(nip=nip).exists():
+                                denied_records.append(f"{nip} (Ten Nip jest już zajęty)")
+                            else:
+                                try:
+                                    # Check if data_poczatkowa is provided
+                                    if data_poczatkowa is not None:
+                                        data_poczatkowa = pd.to_datetime(data_poczatkowa)
+                                        if data_poczatkowa == pd.NaT:
+                                            raise ValueError("Invalid or empty data_poczatkowa")
+                                    else:
+                                        raise ValueError("data_poczatkowa is required")
 
-                        self.message_user(request, 'Import zakończony pomyślnie.')
+                                    NIPRecord.objects.create(nip=nip, nazwa=nazwa, email_uzytkownika=email,
+                                                             numer_telefonu_klienta=numer_telefonu,
+                                                             data_poczatkowa=data_poczatkowa)
+
+                                    # Dodaj wpis do logów administracyjnych
+                                    LogEntry.objects.log_action(
+                                        user_id=user.id,
+                                        content_type_id=ContentType.objects.get_for_model(NIPRecord).pk,
+                                        object_id=None,
+                                        object_repr=force_str('Import danych NIP'),
+                                        action_flag=CHANGE,
+                                        change_message=f'Import danych NIP z pliku CSV. Dodano rekord o NIP: {nip}',
+                                    )
+
+                                    successful_imports += 1
+                                except Exception as e:
+                                    # Handle the specific error related to missing data_poczatkowa
+                                    denied_records.append(f"{nip} (data_poczatkowa jest wymagana)")
+
+                        if successful_imports > 0:
+                            denied_nips_str = ', '.join(map(str, denied_records))
+                            return HttpResponse(f"Import completed. Imported {successful_imports} records. Denied NIPs: {denied_nips_str}")
+                        elif denied_records:
+                            denied_nips_str = ', '.join(map(str, denied_records))
+                            return HttpResponse(f"Import failed. Denied NIPs: {denied_nips_str}")
+                        else:
+                            return HttpResponse("No records were imported.")
+                    except ValueError as ve:
+                        # Handle the specific error related to invalid or empty data_poczatkowa
+                        denied_records.append(f"{nip} (data_poczatkowa is required)")
                     except Exception as e:
-                        self.message_user(request, f'Błąd podczas importowania danych: {str(e)}')
+                        return HttpResponse(f"Error importing NIP records: {e}")
                 else:
-                    self.message_user(request, 'Niewłaściwy format pliku. Zaimportuj plik CSV.')
+                    return HttpResponse('Invalid file format. Please import a CSV file.')
 
-        return render(request, 'admin/import_records.html', {'form': NIPRecordImportForm()})
+        return render(request, 'admin/import_records.html')
+
+    def import_users(request):
+        if request.method == 'POST':
+            uploaded_file = request.FILES.get('file')
+
+            if uploaded_file:
+                if uploaded_file.name.endswith('.csv'):
+                    try:
+                        df = pd.read_csv(uploaded_file, encoding='utf-8-sig')
+
+                        for index, row in df.iterrows():
+                            # Process and save user data to the User model
+                            user_data = {
+                                'username': row['username'],
+                                'email': row['email'],
+                                # Add other user data fields here
+                            }
+                            user, created = User.objects.get_or_create(email=user_data['email'], defaults=user_data)
+                            if not created:
+                                # User with the same email already exists, handle it as needed
+                                # For example, you can update the existing user or log the conflict
+                                pass
+
+                        return HttpResponse("User import completed successfully.")
+                    except Exception as e:
+                        return HttpResponse(f"Error importing users: {e}")
+                else:
+                    return HttpResponse('Invalid file format. Please import a CSV file.')
+            else:
+                return HttpResponse('No file selected.')
+
+        return render(request, 'admin/import_users.html')
+
+
     def export_selected_records(self, request, queryset):
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="nip_records.csv"'
 
         writer = csv.writer(response)
-        writer.writerow(['nip', 'nazwa', 'email_klienta', 'numer_telefonu_klienta', 'data_poczatkowa', 'data_koncowa', 'status'])
+        writer.writerow(['nip', 'nazwa', 'email_uzytkownika', 'numer_telefonu_klienta', 'data_poczatkowa', 'data_koncowa', 'status'])
 
         for record in queryset:
-            writer.writerow([record.nip, record.nazwa, record.email_klienta, record.numer_telefonu_klienta,
+            writer.writerow([record.nip, record.nazwa, record.email_uzytkownika, record.numer_telefonu_klienta,
                              record.data_poczatkowa, record.data_koncowa, record.status])
 
         return response
@@ -81,9 +157,13 @@ class NIPRecordAdmin(admin.ModelAdmin):
         urlpatterns = super().get_urls()
         custom_urls = [
             path('import_records/', self.import_records, name='import_records'),
+            path('import_users/', self.import_users, name='import_users'),
         ]
         return custom_urls + urlpatterns
 
-
 admin.site.register(NIPRecord, NIPRecordAdmin)
 admin.site.register(EmailAddress)
+admin.site.register(LogEntry, CustomLogEntryAdmin)
+
+from .models import Settings
+admin.site.register(Settings)

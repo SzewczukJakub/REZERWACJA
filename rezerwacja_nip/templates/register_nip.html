@@ -68,14 +68,22 @@
                 {% endfor %}
             </ul>
  {% endif %}
-<form method="post" action="/your-registration-url/" class="registration-form">
-    <input type="hidden" name="csrfmiddlewaretoken" value="...">
-    <p><label for="id_email">Email:</label> <input type="email" name="email" id="id_email"></p>
-    <p><label for="id_nip">NIP:</label> <input type="text" name="nip" id="id_nip"></p>
-    <p><label for="id_nazwa">Nazwa:</label> <input type="text" name="nazwa" id="id_nazwa"></p>
-    <p><label for="id_numer_telefonu_klienta">Numer telefonu klienta:</label> <input type="text" name="numer_telefonu_klienta" id="id_numer_telefonu_klienta"></p>
-    <button type="submit">Register</button>
+ <div id="logo">
+    <img src="/home/sabukxdl/REZERWACJA/rezerwacja_nip/resources/elomoto.eco-logo-final.png" alt="Company Logo" id="img">
+ </div>
+<!---<form method="post" action="{% url 'register_nip' %}" class="registration-form">-->
+    {% csrf_token %}
+    <label for="{{ registration_form.email.id_for_label }}">Email:</label>
+    {{ registration_form.email }}
+    <label for="{{ registration_form.nip.id_for_label }}">NIP:</label>
+    {{ registration_form.nip }}
+    <label for="{{ registration_form.nazwa.id_for_label }}">Nazwa:</label>
+    {{ registration_form.nazwa }}
+    <label for="{{ registration_form.numer_telefonu_klienta.id_for_label }}">Numer telefonu klienta:</label>
+    {{ registration_form.numer_telefonu_klienta }}
+    <button>Register</button>
+<!---</form>-->
+<a href="{% url 'home' %}">Powrót</a>
 
-</form>
 </body>
 </html>

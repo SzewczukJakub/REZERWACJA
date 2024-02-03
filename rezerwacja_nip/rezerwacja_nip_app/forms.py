@@ -1,28 +1,44 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from django.core.validators import BaseValidator
+from django.contrib import messages
+from django.utils.deconstruct import deconstructible
+from django.utils.translation import gettext_lazy as _
 
+
+def validate_ten_digit_nip(value):
+    if len(str(value)) != 10:
+        raise ValidationError(_('NIP must be a 10-digit number.'), code='invalid_nip')
+
+def validate_nine_digit_phone(value):
+    if len(str(value)) != 9:
+        raise ValidationError(_('Numer telefonu musi mieć dziewięć cyfr'), code='invalid_numer_telefonu')
 
 class NIPRegistrationForm(forms.Form):
-    email = forms.EmailField(label='email_klienta')
-    nip = forms.CharField(label='NIP')
-    nazwa= forms.CharField(label='nazwa')
-    numer_telefonu_klienta= forms.CharField(label='Numer telefonu klienta', required=False)
+    email = forms.EmailField(label='email_uzytkownika')
+    nip = forms.IntegerField(
+        validators=[validate_ten_digit_nip],
+        label='NIP'
+    )
+    nazwa= forms.CharField(label='nazwa',required=False)
+    numer_telefonu_klienta= forms.IntegerField(
+        validators=[validate_nine_digit_phone],
+        label='Numer telefonu klienta',
+        required=False
+    )
 
-    def clean_numer_telefonu_klienta(self):
-        numer_telefonu_klienta = self.cleaned_data.get('numer_telefonu_klienta')
+    def clean(self):
+        cleaned_data = super().clean()
+        cleaned_data.get('nazwa')
+        cleaned_data.get('numer_telefonu_klienta')
+        return cleaned_data
 
-        # Jeśli numer telefonu nie został podany, to jest poprawny (opcjonalny)
-        if not numer_telefonu_klienta:
-            return numer_telefonu_klienta
+    def dataEmailNip(self):
+        data=super()
+        data.get('email')
+        data.get('nip')
+        return data
 
-        # Usunięcie spacji i myślników, aby pozostały tylko cyfry
-        cleaned_numer_telefonu = ''.join(filter(str.isdigit, numer_telefonu_klienta))
-
-        # Sprawdzenie, czy numer telefonu ma dokładnie 9 cyfr
-        if len(cleaned_numer_telefonu) != 9:
-            raise forms.ValidationError('Numer telefonu musi zawierać dokładnie 9 cyfr.')
-
-        return cleaned_numer_telefonu
 
 class AdminLoginForm(forms.Form):
     username = forms.CharField(label='Username')

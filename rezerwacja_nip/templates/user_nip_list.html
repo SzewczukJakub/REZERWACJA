@@ -5,10 +5,13 @@
     <meta name="viewport"
           content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.js"></script>
+
     <title>Document</title>
 </head>
 <style>
-    body {
+body {
     background-color: #f0f0f0; /* Kolor tła */
     font-family: Arial, sans-serif; /* Czcionka */
     margin: 0;
@@ -77,38 +80,164 @@
 .logout-button:hover {
     background-color: #E54E2E; /* Kolor tła po najechaniu myszką */
 }
+
+#logo{
+    height:20%;
+    width:20%;
+    float:left;
+}
+#img{
+    width:100%;
+}
+#rejestracja{
+    width:80%;
+
+}
+ #lista {
+    width: 80%;
+    margin: 20px auto; /* Center the table with some top margin */
+}
+
+#lista table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+
+}
+
+#lista th, #lista td {
+    border: 1px solid #ddd;
+    padding: 12px; /* Increase padding for more spacing */
+    text-align: left;
+}
+
+#lista th {
+    background-color: #f2f2f2;
+}
+
+.dataTables_wrapper {
+    position: relative;
+    clear: both;
+    zoom: 1;
+}
+
+.dataTables_filter {
+    float: right;
+    margin-bottom: 10px;
+}
+
+.dataTables_length {
+    margin-top: 10px;
+}
+
+#nipTable_paginate {
+    text-align: center;
+    margin-top: 20px;
+}
+
+#nipTable_paginate span.current {
+    background-color: #007bff;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 3px;
+    margin: 0 5px;
+}
+
+#nipTable_paginate a {
+    padding: 5px 10px;
+    margin: 0 5px;
+    text-decoration: none;
+    color: #007bff;
+    border: 1px solid #007bff;
+    border-radius: 3px;
+    transition: background-color 0.3s;
+}
+
+#nipTable_paginate a:hover {
+    background-color: #007bff;
+    color: #fff;
+}
+a{
+    width:100%;
+}
 </style>
 <body>
+
 {% block content %}
-    <div class="registration-form-container">
-        <h1 class="registration-header">Rejestracja NIP</h1>
-
-        {% if messages %}
-            <ul class="messages">
-                {% for message in messages %}
-                    <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-
-        <form class="registration-form" method="post" action="{% url 'register_nip' %}">
-            {% csrf_token %}
-            {{ registration_form.as_p }}
-            <button class="registration-button" type="submit">Zarejestruj NIP</button>
-        </form>
+<header>
+    <div id="logo">
+        <img src="/home/sabukxdl/REZERWACJA/rezerwacja_nip/resources/elomoto.eco-logo-final.png" alt="Company Logo" id="img">
     </div>
 
-    <h1>Twoje numery NIP</h1>
+    <div class="registration-form-container" id="rejestracja">
+        <h1 class="registration-header">Rejestracja NIP</h1>
+        <div class="registration-form">
+        {% if registration_form.is_bound %}
+            {% if messages %}
+                <ul class="messages">
+                    {% for message in messages %}
+                        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endif %}
 
-    <ul>
-        {% for nip in user_nips %}
-            <li>{{ nip.nip }} - {{ nip.current_status }}</li>
-        {% endfor %}
-    </ul>
+        <a href="{% url 'register_nip' %}" class="registration-form"><button class="registration-button">Zarejestruj Nip</button></a>
+        </div>
+    </div>
+
 
     {% if user.is_authenticated %}
+        <div>
+            <h3> {{ user.first_name }} {{ user.last_name }}</h3>
+        </div>
         <a href="{% url 'logout' %}" class="logout-button">Wyloguj się</a>
     {% endif %}
-{% endblock %}
+</header>
+    <div id="lista">
+        <h1>Twoje rezerwacje</h1>
+
+        <div class="dataTableWrapper">
+            <table id="nipTable">
+                <thead>
+                    <tr>
+                        <th>Numer NIP</th>
+                        <th>Nazwa firmy</th>
+                        <th>Numer telefonu</th>
+                        <th>Status rezerwacji</th>
+                        <th>Ważny do</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for nip in user_nips %}
+                    <tr>
+                        <td>{{ nip.nip }}</td>
+                        <td>{{ nip.nazwa }}</td>
+                        <td>{{ nip.numer_telefonu_klienta }}</td>
+                        <td>{{ nip.status }}</td>
+                        <td>{{ nip.data_koncowa }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endblock %}
+
+    <script>
+        $(document).ready(function () {
+            $('#nipTable').DataTable({
+                "lengthMenu": [25, 50, 100], // Entries dropdown options excluding 10
+                "pageLength": 50, // Default number of entries
+                "dom": 'lfrtip', // Display only length changing and information elements
+                "language": {
+                    "url": "https://cdn.datatables.net/plug-ins/1.11.5/i18n/Polish.json"
+                }
+            });
+
+            // Add a search bar with label
+            $('.dataTables_filter input').attr("placeholder", "Search");
+        });
+    </script>
 </body>
 </html>

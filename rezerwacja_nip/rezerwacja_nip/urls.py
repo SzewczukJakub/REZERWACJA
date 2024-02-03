@@ -14,4 +14,5 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'),
     path('import_records/', views.import_records, name='import_records'),
     path('export_records/', views.export_records, name='export_records'),
+    path('admin/update_expiration_days/<int:record_id>/', views.update_expiration_days, name='update_expiration_days'),
 ]
