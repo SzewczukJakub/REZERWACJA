@@ -13,6 +13,10 @@ from .models import User
 from django.contrib.admin.models import LogEntry, CHANGE
 from django.contrib.contenttypes.models import ContentType
 from django.utils.encoding import force_str
+import logging
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(filename='import_log.txt', level=logging.DEBUG)
 
 class CustomLogEntryAdmin(admin.ModelAdmin):
     list_display = ['action_time', 'user', 'content_type', 'object_repr', 'change_message']
@@ -40,70 +44,99 @@ class NIPRecordAdmin(admin.ModelAdmin):
             if uploaded_file:
                 if uploaded_file.name.endswith('.csv'):
                     try:
-                        df = pd.read_csv(uploaded_file, encoding='utf-8-sig')
-
-                        denied_records = []  # Store denied NIP records
+                        df = pd.read_csv(uploaded_file, dtype={'numer_telefonu_klienta': str})
+                        df = df[~df['nip'].astype(str).str.startswith('#')]
+                        df.columns = df.columns.str.strip()
+                        print(df)
+                        denied_records = []
                         successful_imports = 0
 
-                        # Pobierz użytkownika wykonującego import
                         user = request.user
 
+                        # Ensure that 'nip' column exists in the DataFrame
+                        if 'nip' not in df.columns:
+                            return HttpResponse("Error: 'nip' column not found in the CSV file.")
+
                         for index, row in df.iterrows():
-                            nip = row['nip']
-                            nazwa = row['nazwa']
-                            email = row['email_uzytkownika']
-                            numer_telefonu = row['numer_telefonu_klienta']
-                            data_poczatkowa = row.get('data_poczatkowa', None)
+                            try:
+                                nip = row['nip']  # Correctly reference the 'nip' column
+                                logging.debug(f'nip: {nip}')
+                                name = row['nazwa']
+                                email = row['email_uzytkownika']
+                                phone_number = str(row['numer_telefonu_klienta']).strip()
+                                logging.debug(f'Type of phone_number: {type(phone_number)}')
+                                start_date = row.get('data_poczatkowa', None)
+                                end_date = row.get('data_koncowa', None)
 
-                            # Check if the NIP record already exists
-                            if NIPRecord.objects.filter(nip=nip).exists():
-                                denied_records.append(f"{nip} (Ten Nip jest już zajęty)")
-                            else:
-                                try:
-                                    # Check if data_poczatkowa is provided
-                                    if data_poczatkowa is not None:
-                                        data_poczatkowa = pd.to_datetime(data_poczatkowa)
-                                        if data_poczatkowa == pd.NaT:
-                                            raise ValueError("Invalid or empty data_poczatkowa")
-                                    else:
-                                        raise ValueError("data_poczatkowa is required")
+                                if not name and not phone_number:
+                                    denied_records.append(f"{nip} (Both name and phone_number are empty)")
+                                    continue
 
-                                    NIPRecord.objects.create(nip=nip, nazwa=nazwa, email_uzytkownika=email,
-                                                             numer_telefonu_klienta=numer_telefonu,
-                                                             data_poczatkowa=data_poczatkowa)
+                                if name and not phone_number:
+                                    phone_number = None
 
-                                    # Dodaj wpis do logów administracyjnych
+                                if phone_number and not name:
+                                    name = None
+
+                                if NIPRecord.objects.filter(nip=nip).exists():
+                                    denied_records.append(f"{nip} (This Nip already exists)")
+                                else:
+                                    start_date = pd.to_datetime(start_date, errors='coerce')  # Handle errors by converting them to NaT
+                                    if pd.isna(start_date):
+                                        denied_records.append(f"{nip} (invalid start_date)")
+                                        continue  # Skip to the next iteration if start_date is invalid
+
+                                    if end_date is not None:
+                                        end_date = pd.to_datetime(end_date, errors='coerce')  # Handle errors by converting them to NaT
+                                        if pd.isna(end_date):
+                                            denied_records.append(f"{nip} (invalid end_date)")
+                                            continue  # Skip to the next iteration if end_date is invalid
+
+                                    # Create the NIPRecord object
+                                    NIPRecord.objects.create(nip=nip, nazwa=name, email_uzytkownika=email,
+                                                             numer_telefonu_klienta=phone_number,
+                                                             data_poczatkowa=start_date, data_koncowa=end_date)
+
+                                    # Log the action
                                     LogEntry.objects.log_action(
                                         user_id=user.id,
                                         content_type_id=ContentType.objects.get_for_model(NIPRecord).pk,
                                         object_id=None,
-                                        object_repr=force_str('Import danych NIP'),
+                                        object_repr=force_str('NIP Data Import'),
                                         action_flag=CHANGE,
-                                        change_message=f'Import danych NIP z pliku CSV. Dodano rekord o NIP: {nip}',
+                                        change_message=f'NIP Data imported from CSV file. Added record with NIP: {nip}',
                                     )
 
                                     successful_imports += 1
-                                except Exception as e:
-                                    # Handle the specific error related to missing data_poczatkowa
-                                    denied_records.append(f"{nip} (data_poczatkowa jest wymagana)")
-
+                            except KeyError:
+                                denied_records.append("NIP value missing in the CSV file")
+                            except Exception as e:
+                                denied_records.append(f"An error occurred: {e}")
                         if successful_imports > 0:
                             denied_nips_str = ', '.join(map(str, denied_records))
-                            return HttpResponse(f"Import completed. Imported {successful_imports} records. Denied NIPs: {denied_nips_str}")
+                            return HttpResponse(
+                                f'Import completed. Imported {successful_imports} records. Denied NIPs: {denied_nips_str}<br><a href="https://sabukxdl.pythonanywhere.com/admin/rezerwacja_nip_app/niprecord/import_records/">Powrót</a>')
                         elif denied_records:
                             denied_nips_str = ', '.join(map(str, denied_records))
-                            return HttpResponse(f"Import failed. Denied NIPs: {denied_nips_str}")
+                            return HttpResponse(f'Import failed. Denied NIPs: {denied_nips_str}<br><a href="https://sabukxdl.pythonanywhere.com/admin/rezerwacja_nip_app/niprecord/import_records/">Powrót</a>')
                         else:
                             return HttpResponse("No records were imported.")
                     except ValueError as ve:
-                        # Handle the specific error related to invalid or empty data_poczatkowa
-                        denied_records.append(f"{nip} (data_poczatkowa is required)")
+                        return HttpResponse("Error importing NIP records: start_date is required")
                     except Exception as e:
                         return HttpResponse(f"Error importing NIP records: {e}")
                 else:
                     return HttpResponse('Invalid file format. Please import a CSV file.')
-
+            else:
+                return HttpResponse('No file uploaded.')
         return render(request, 'admin/import_records.html')
+
+
+
+
+
+
+
 
     def import_users(request):
         if request.method == 'POST':
