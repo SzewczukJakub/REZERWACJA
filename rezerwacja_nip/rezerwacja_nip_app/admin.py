@@ -117,10 +117,10 @@ class NIPRecordAdmin(admin.ModelAdmin):
                         if successful_imports > 0:
                             denied_nips_str = ', '.join(map(str, denied_records))
                             return HttpResponse(
-                                f'Import completed. Imported {successful_imports} records. Denied NIPs: {denied_nips_str}<br><a href="https://sabukxdl.pythonanywhere.com/admin/rezerwacja_nip_app/niprecord/import_records/">Powrót</a>')
+                                f'Import completed. Imported {successful_imports} records. Denied NIPs: {denied_nips_str}<br><a href="http://elomotonip.eu.pythonanywhere.com/admin/rezerwacja_nip_app/niprecord/import_records/">Powrót</a>')
                         elif denied_records:
                             denied_nips_str = ', '.join(map(str, denied_records))
-                            return HttpResponse(f'Import failed. Denied NIPs: {denied_nips_str}<br><a href="https://sabukxdl.pythonanywhere.com/admin/rezerwacja_nip_app/niprecord/import_records/">Powrót</a>')
+                            return HttpResponse(f'Import failed. Denied NIPs: {denied_nips_str}<br><a href="http://elomotonip.eu.pythonanywhere.com/admin/rezerwacja_nip_app/niprecord/import_records/">Powrót</a>')
                         else:
                             return HttpResponse("No records were imported.")
                     except ValueError as ve:
