@@ -5,6 +5,8 @@ from django.http import HttpResponse
 from django.urls import reverse
 from django.utils.html import format_html
 from django.urls import path
+from django.utils.timezone import localtime
+
 from .forms import NIPRecordImportForm
 from .models import NIPRecord, EmailAddress
 from django.shortcuts import render
@@ -170,22 +172,25 @@ class NIPRecordAdmin(admin.ModelAdmin):
 
         return render(request, 'admin/import_users.html')
 
-
     def export_selected_records(self, request, queryset):
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="nip_records.csv"'
 
         writer = csv.writer(response)
-        writer.writerow(['nip', 'nazwa', 'email_uzytkownika', 'numer_telefonu_klienta', 'data_poczatkowa', 'data_koncowa', 'status'])
+        writer.writerow(
+            ['nip', 'nazwa', 'email_uzytkownika', 'numer_telefonu_klienta', 'data_poczatkowa', 'data_koncowa',
+             'status'])
 
         for record in queryset:
+            # Formatujemy daty do odpowiedniego formatu tekstowego
+            start_date = localtime(record.data_poczatkowa).strftime('%d.%m.%Y %H:%M:%S')
+            end_date = localtime(record.data_koncowa).strftime('%d.%m.%Y %H:%M:%S') if record.data_koncowa else ''
             writer.writerow([record.nip, record.nazwa, record.email_uzytkownika, record.numer_telefonu_klienta,
-                             record.data_poczatkowa, record.data_koncowa, record.status])
+                             start_date, end_date, record.status])
 
         return response
 
     export_selected_records.short_description = "Eksportuj zaznaczone rekordy"
-
     def get_urls(self):
         urlpatterns = super().get_urls()
         custom_urls = [
